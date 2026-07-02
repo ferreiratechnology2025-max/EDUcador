@@ -50,13 +50,19 @@ Se você não tem certeza da resposta do tutor, marque revise e indique onde est
 """
 
 def _try_extract_json(text: str) -> Optional[Dict[str, Any]]:
-    """Tenta extrair JSON do texto em caso de falha no formato."""
-    match = re.search(r"\{.*\}", text, re.DOTALL)
-    if match:
-        try:
-            return json.loads(match.group())
-        except json.JSONDecodeError:
-            return None
+    """Tenta extrair JSON do texto. Usa pilha para capturar {} completos."""
+    stack = []
+    for i, ch in enumerate(text):
+        if ch == "{":
+            stack.append(i)
+        elif ch == "}":
+            if stack:
+                start = stack.pop()
+                if not stack:
+                    try:
+                        return json.loads(text[start : i + 1])
+                    except json.JSONDecodeError:
+                        pass
     return None
 
 def call_validator(

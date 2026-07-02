@@ -2,6 +2,7 @@
 Teste de integracao do pipeline completo.
 """
 
+import pytest
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -11,6 +12,7 @@ from src.rag.simple_rag import SimpleRAG
 from src.memory.history import Memory
 
 
+@pytest.mark.integration
 def test_pipeline_basic():
     """Teste basico do pipeline com uma pergunta simples."""
     print("\n=== Teste 1: Pipeline Basico ===")
@@ -32,6 +34,7 @@ def test_pipeline_basic():
     return result
 
 
+@pytest.mark.integration
 def test_pipeline_with_history():
     """Teste com historico de interacoes."""
     print("\n=== Teste 2: Pipeline com Historico ===")

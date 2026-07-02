@@ -1,48 +1,30 @@
 #!/usr/bin/env python
 """
-Executa todos os testes do EDUcador.
+Executa todos os testes do EDUcador via pytest.
 
-Testes offline (rodam sempre):
-- RAG
-- Memoria
-
-Testes de integracao (precisam de Ollama rodando + modelos instalados):
-- Pipeline
+Uso:
+    python tests/run_all_tests.py           # testes offline
+    python tests/run_all_tests.py --all     # offline + integracao
+    python tests/run_all_tests.py --integration  # so integracao
 """
+
 import sys
 import subprocess
 from pathlib import Path
 
 
-def run_test(name: str, module: str, optional: bool = False) -> bool:
-    print(f"\n{'=' * 50}")
-    print(f"Executando: {name}")
-    print('=' * 50)
-
-    try:
-        result = subprocess.run(
-            [sys.executable, "-m", module],
-            capture_output=True,
-            text=True,
-            timeout=300,
-        )
-        print(result.stdout)
-        if result.stderr:
-            print("STDERR:", result.stderr)
-
-        if result.returncode == 0:
-            print(f"OK {name}")
-            return True
-
-        print(f"FALHOU {name} (codigo {result.returncode})")
-        return False
-
-    except subprocess.TimeoutExpired:
-        print(f"FALHOU {name} (timeout - Ollama nao respondeu em 5 min)")
-        return False
-    except Exception as e:
-        print(f"FALHOU {name} (erro ao executar: {e})")
-        return False
+def run_pytest(marker: str = "not integration", timeout: int = 120) -> int:
+    cmd = [
+        sys.executable, "-m", "pytest",
+        "-x",  # stop on first failure
+        "-v",
+        "-m", marker,
+        "--tb=short",
+        "-p", "no:cacheprovider",
+    ]
+    print(f"Executando: {' '.join(cmd)}")
+    result = subprocess.run(cmd, timeout=timeout)
+    return result.returncode
 
 
 def main():
@@ -50,54 +32,32 @@ def main():
     print("  EDUcador - Suite de Testes")
     print("=" * 60)
 
-    # Testes offline (devem rodar sempre)
-    offline_tests = [
-        ("RAG", "tests.test_rag"),
-        ("Memoria", "tests.test_memory"),
-    ]
+    args = set(sys.argv[1:])
 
-    # Testes de integracao (precisam de Ollama)
-    integration_tests = [
-        ("Pipeline (integracao)", "tests.test_pipeline"),
-    ]
-
-    passed = 0
-    failed = 0
-    skipped = 0
-
-    print("\n>>> TESTES OFFLINE")
-    for name, module in offline_tests:
-        if run_test(name, module):
-            passed += 1
-        else:
-            failed += 1
-
-    print("\n>>> TESTES DE INTEGRACAO (requer Ollama rodando)")
-    # Pergunta ao usuario se quer rodar testes de integracao
-    if len(sys.argv) > 1 and sys.argv[1] in ("--integration", "--all"):
-        run_integration = True
+    if "--integration" in args:
+        codes = [run_pytest("integration", timeout=300)]
+        label = "INTEGRACAO"
+    elif "--all" in args:
+        print("\n>>> TESTES OFFLINE")
+        c1 = run_pytest("not integration", timeout=120)
+        print("\n>>> TESTES DE INTEGRACAO")
+        c2 = run_pytest("integration", timeout=300)
+        codes = [c1, c2]
+        label = "COMPLETOS"
     else:
-        try:
-            resp = input("Rodar testes de integracao? (s/N): ").strip().lower()
-            run_integration = resp in ("s", "sim", "y", "yes")
-        except EOFError:
-            run_integration = False
+        c1 = run_pytest("not integration", timeout=120)
+        codes = [c1]
+        label = "OFFLINE"
+        print("\nDica: use --all para rodar tambem os testes de integracao (requer Ollama).")
 
-    if run_integration:
-        for name, module in integration_tests:
-            if run_test(name, module):
-                passed += 1
-            else:
-                failed += 1
-    else:
-        print("Pulando testes de integracao. Use --integration ou --all pra rodar.")
-        skipped = len(integration_tests)
+    passed = all(c == 0 for c in codes)
+    total = len(codes)
+    ok = sum(1 for c in codes if c == 0)
+    print(f"\n{'=' * 60}")
+    print(f"  TESTES {label}: {ok}/{total} suites passaram")
+    print(f"{'=' * 60}")
 
-    print("\n" + "=" * 60)
-    print(f"RESULTADO: {passed} aprovados, {failed} falhas, {skipped} pulados")
-    print("=" * 60)
-
-    if failed > 0:
+    if not passed:
         sys.exit(1)
 
 

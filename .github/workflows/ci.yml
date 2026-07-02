@@ -1,0 +1,36 @@
+name: EDUcador CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run offline tests
+        run: |
+          python -m pytest -v -m "not integration" --tb=short
+
+      - name: Run all tests (with Ollama)
+        if: ${{ false }}  # disabled until self-hosted runner with Ollama
+        run: |
+          python -m pytest -v --tb=short
