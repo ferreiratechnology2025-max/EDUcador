@@ -1,0 +1,36 @@
+probes:
+  - id: isolar_x_adicao_1
+    competency: isolar_incognita_adicao
+    difficulty_level: 1
+    prompt_template: "Resolva: x + 3 = 7"
+    expected_response_schema: "numeric"
+    evidence_weight: 1
+    evaluator_type: "exact_match"
+    evaluator_config: {"expected": "4"}
+
+  - id: isolar_x_adicao_2
+    competency: isolar_incognita_adicao
+    difficulty_level: 2
+    prompt_template: "Resolva: x + 15 = 42"
+    expected_response_schema: "numeric"
+    evidence_weight: 1
+    evaluator_type: "exact_match"
+    evaluator_config: {"expected": "27"}
+
+  - id: isolar_x_multiplicacao_1
+    competency: isolar_incognita_multiplicacao
+    difficulty_level: 1
+    prompt_template: "Resolva: 3x = 15"
+    expected_response_schema: "numeric"
+    evidence_weight: 1
+    evaluator_type: "exact_match"
+    evaluator_config: {"expected": "5"}
+
+  - id: isolar_x_multiplicacao_2
+    competency: isolar_incognita_multiplicacao
+    difficulty_level: 2
+    prompt_template: "Resolva: 7x = 56"
+    expected_response_schema: "numeric"
+    evidence_weight: 1
+    evaluator_type: "exact_match"
+    evaluator_config: {"expected": "8"}

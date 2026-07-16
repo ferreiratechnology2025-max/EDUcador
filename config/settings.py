@@ -38,6 +38,12 @@ class PipelineConfig:
     history_size: int = 3
 
 
+@dataclass
+class EngineConfig:
+    engine: str = "current"
+    session_timeout_minutes: int = 30
+
+
 def validate_paths():
     DATA_DIR.mkdir(exist_ok=True)
     if not CORPUS_PATH.exists():

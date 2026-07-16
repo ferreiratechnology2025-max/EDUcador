@@ -1,0 +1,16 @@
+competencies:
+  - id: isolar_incognita_adicao
+    name: "Isolar incógnita com adição"
+    difficulty: 1
+    prerequisites: []
+    probes:
+      - isolar_x_adicao_1
+      - isolar_x_adicao_2
+
+  - id: isolar_incognita_multiplicacao
+    name: "Isolar incógnita com multiplicação"
+    difficulty: 2
+    prerequisites: ["isolar_incognita_adicao"]
+    probes:
+      - isolar_x_multiplicacao_1
+      - isolar_x_multiplicacao_2

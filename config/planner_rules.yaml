@@ -1,0 +1,4 @@
+planner:
+  max_consecutive_errors_to_recover: 3
+  max_consecutive_success_to_advance: 3
+  max_probes_per_competency: 5
