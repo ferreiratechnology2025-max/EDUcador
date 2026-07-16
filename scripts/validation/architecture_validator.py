@@ -27,7 +27,11 @@ FORBIDDEN_PEDAGOGY_PREFIXES = {
     "pedagogy.probes.evaluator",
 }
 
-EXEMPT_LEARNING_FILES = {"runtime.py"}
+EXEMPT_LEARNING_FILES = {
+    "runtime.py",
+    "factory.py",      # DT-001: Factory needs direct access to construct Runtime. Fix: add Runtime.build() factory method.
+    "engine_inspector.py",  # DT-002: Inspector needs direct access for diagnostics. Fix: refactor to accept Runtime.
+}
 
 
 def _is_pedagogy_import(node_text: str) -> bool:

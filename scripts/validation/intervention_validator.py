@@ -30,7 +30,6 @@ def _get_final_action(engine, session_id: str, user_input: str):
         evidence = rt._extractor.extract(user_input, ctx, action)
         if evidence:
             rt._event_store.append(session_id, evidence)
-            ctx.recent_evidence.append(evidence)
             ctx.student.evidence_window.append(evidence)
             action = rt._planner.decide(ctx)
 

@@ -1,0 +1,13 @@
+# PR-3: Validation Framework Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Create a validation framework with 4 validators (contract, planner, intervention, architecture), a `ValidationRegistry` with explicit module discovery via `pkgutil`, and an updated `ExecutionResult` dataclass documenting the `Executor → Runtime → EventStore` evidence contract. Also acknowledge that the central pedagogical hypothesis remains untested (the investment in architectural governance is an acknowledged bet).
+
+**Architecture:** Six modules under `scripts/validation/`, `ValidationRegistry` with `pkgutil.iter_modules` for explicit discovery, architecture validation using `ast` (zero deps). Each validator self-registers on import via `ValidationRegistry.register()`; the registry discovers all modules automatically so no manual import list is maintained.
+
+**Tech Stack:** Python 3.10+, pytest, tempfile, unittest.mock, ast, pkgutil
+
+**Hypothesis Status:** The central hypothesis — that the investigation cycle (hypothesis → probe → evidence) produces more learning than direct explanation — has NOT been validated. The investment in architectural governance (PR-3, invariants, dependency graph, CI) is an acknowledged bet. Benchmark with real users or simulated teachers is the immediate priority after PR-3.
+
+---

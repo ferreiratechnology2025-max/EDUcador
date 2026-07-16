@@ -1,12 +1,4 @@
-#!/usr/bin/env python
-"""
-Ponto de entrada do EDUcador.
-
-Modos de uso:
-- python run.py                 -> abre interface Streamlit (padrao)
-- python run.py "pergunta aqui" -> roda pipeline no terminal com a pergunta
-- echo "pergunta" | python run.py -> le pergunta do stdin
-"""
+#!/usr/bin/env python3
 
 import os
 import sys
@@ -15,6 +7,8 @@ import subprocess
 import json
 from pathlib import Path
 import requests
+
+sys.path.insert(0, str(Path(__file__).parent))
 
 REQUIRED_MODELS = ["gemma3:4b", "phi4-mini"]
 OPTIONAL_MODELS = ["llama3.2-vision"]
@@ -122,7 +116,6 @@ def ensure_models():
 
 
 def ensure_ollama_and_models() -> bool:
-    """Garante que Ollama esta rodando e os modelos necessarios estao instalados."""
     if not check_ollama_running():
         if not start_ollama():
             print("\nOllama nao esta instalado.")
@@ -138,41 +131,28 @@ def ensure_ollama_and_models() -> bool:
     return True
 
 
-def run_terminal(question: str) -> None:
-    """Roda o pipeline no terminal com a pergunta fornecida."""
-    sys.path.insert(0, str(Path(__file__).parent))
+def run_terminal(question: str, engine_type: str = "current") -> None:
+    from src.learning.engine import create_engine
 
-    from src.core.pipeline import run_pipeline
-    from src.rag.simple_rag import SimpleRAG
-    from src.memory.history import Memory
-    from config.settings import CORPUS_PATH
+    engine = create_engine(engine_type)
+    info = engine.get_session_info("terminal")
 
     print("=" * 60)
     print(f"  Pergunta: {question}")
+    print(f"  Motor: {info['engine']}")
     print("=" * 60)
 
-    rag = None
-    if CORPUS_PATH.exists():
-        try:
-            rag = SimpleRAG(str(CORPUS_PATH))
-        except Exception as e:
-            print(f"[Aviso] RAG indisponivel: {e}")
-
-    memory = Memory(max_size=10)
-
     try:
-        result = run_pipeline(
-            student_input=question,
-            memory=memory,
-            rag=rag,
-            verbose=True,
-        )
+        response = engine.process(user_input=question, session_id="terminal")
         print("\n" + "=" * 60)
         print("  Resposta:")
         print("=" * 60)
-        print(result.final_response)
+        print(response.message)
         print("=" * 60)
-        print(f"  Tempo: {result.total_time_s:.1f}s | Iteracoes: {result.iterations} | RAG: {result.rag_used} | Fallback: {result.fallback_used}")
+        meta = response.metadata or {}
+        if meta:
+            parts = [f"  {k}: {v}" for k, v in meta.items()]
+            print("\n" + "\n".join(parts))
         print("=" * 60)
     except Exception as e:
         print(f"\nErro ao processar: {type(e).__name__}: {e}")
@@ -181,8 +161,6 @@ def run_terminal(question: str) -> None:
 
 def run_streamlit():
     print("Iniciando EDUcador...")
-
-    sys.path.insert(0, str(Path(__file__).parent))
 
     import streamlit.web.cli as stcli
 
@@ -205,25 +183,31 @@ def run_streamlit():
     stcli.main()
 
 
-def get_question_from_args_or_stdin():
-    """
-    Detecta o modo de uso:
-    1. Argumento posicional: python run.py "pergunta"
-    2. Stdin nao-vazio: echo "pergunta" | python run.py
-    3. Nenhum: retorna None (abrir Streamlit)
-    """
-    if len(sys.argv) > 1 and sys.argv[1] and not sys.argv[1].startswith("-"):
-        return " ".join(sys.argv[1:]).strip()
+def parse_args():
+    engine_type = "current"
+    args = sys.argv[1:]
 
-    if not sys.stdin.isatty():
+    if "--engine" in args:
+        idx = args.index("--engine")
+        if idx + 1 < len(args):
+            engine_type = args[idx + 1]
+            args = args[:idx] + args[idx + 2:]
+        else:
+            args.remove("--engine")
+
+    question = None
+    if args and not args[0].startswith("-"):
+        question = " ".join(args).strip()
+
+    if question is None and not sys.stdin.isatty():
         try:
             data = sys.stdin.read()
             if data.strip():
-                return data.strip()
+                question = data.strip()
         except Exception:
             pass
 
-    return None
+    return question, engine_type
 
 
 def main():
@@ -231,10 +215,9 @@ def main():
     print("  EDUcador - Seu Professor Particular")
     print("=" * 60)
 
-    question = get_question_from_args_or_stdin()
+    question, engine_type = parse_args()
 
     if question is None:
-        # Modo UI
         if not ensure_ollama_and_models():
             input("\nPressione Enter para sair...")
             sys.exit(1)
@@ -251,10 +234,9 @@ def main():
             print(f"Erro ao iniciar: {e}")
             input("\nPressione Enter para sair...")
     else:
-        # Modo terminal - pergunta unica
         if not ensure_ollama_and_models():
             sys.exit(1)
-        run_terminal(question)
+        run_terminal(question, engine_type)
 
 
 if __name__ == "__main__":

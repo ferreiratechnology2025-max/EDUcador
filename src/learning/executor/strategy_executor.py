@@ -2,10 +2,10 @@ from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
 from ..domain import PedagogicalDecision, ActionType
-from ...pedagogy.models.context import PedagogicalContext
-from ...pedagogy.models.probe import Probe
-from ...pedagogy.probes.repository import ProbeRepository
-from ...pedagogy.composer.instruction_composer import (
+from src.pedagogy.models.context import PedagogicalContext
+from src.pedagogy.models.probe import Probe
+from src.pedagogy.probes.repository import ProbeRepository
+from src.pedagogy.composer.instruction_composer import (
     InstructionComposer,
     Instruction,
 )

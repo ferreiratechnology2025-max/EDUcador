@@ -36,8 +36,10 @@ def run(verbose: bool = True) -> Tuple[int, int]:
     for root, dirs, files in os.walk(project_root):
         for f in files:
             if f.endswith(".pyc"):
-                py_file = Path(root) / f.removesuffix(".pyc")
-                if not py_file.exists():
+                py_name = f.split(".")[0] + ".py"
+                here = Path(root) / py_name
+                parent = Path(root).parent / py_name
+                if not here.exists() and not parent.exists():
                     stale_pyc += 1
     if stale_pyc:
         if verbose:

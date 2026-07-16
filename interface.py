@@ -1,7 +1,3 @@
-"""
-Interface do EDUcador - Dashboard Streamlit.
-"""
-
 import streamlit as st
 import requests
 import base64
@@ -10,10 +6,8 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from src.core.pipeline import run_pipeline
-from src.rag.simple_rag import SimpleRAG
-from src.memory.history import Memory
-from config.settings import CORPUS_PATH
+from src.learning.engine import create_engine, LearningEngine
+from config.settings import EngineConfig
 
 st.set_page_config(
     page_title="EDUcador - Seu Professor Particular",
@@ -24,21 +18,9 @@ st.set_page_config(
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
-if "memory" not in st.session_state:
-    st.session_state.memory = Memory(max_size=10)
-if "rag" not in st.session_state:
-    try:
-        if CORPUS_PATH.exists():
-            st.session_state.rag = SimpleRAG(str(CORPUS_PATH))
-        else:
-            st.session_state.rag = None
-            st.session_state.rag_error = f"Arquivo de corpus nao encontrado em {CORPUS_PATH}"
-    except FileNotFoundError as e:
-        st.session_state.rag = None
-        st.session_state.rag_error = f"Arquivo de corpus nao encontrado: {e}"
-    except Exception as e:
-        st.session_state.rag = None
-        st.session_state.rag_error = f"Erro ao carregar RAG: {type(e).__name__}: {e}"
+if "engine" not in st.session_state:
+    cfg = EngineConfig()
+    st.session_state.engine = create_engine(cfg.engine)
 
 with st.sidebar:
     st.title("Configuracoes")
@@ -62,16 +44,13 @@ with st.sidebar:
 
     st.divider()
 
-    if st.session_state.rag:
-        st.success(f"RAG ativo ({len(st.session_state.rag.docs)} exemplos)")
+    if st.session_state.engine.get_session_info("default").get("engine") == "current_pipeline":
+        st.success("Motor Atual (Pipeline Clássico)")
     else:
-        st.warning("RAG nao disponivel")
-        if getattr(st.session_state, "rag_error", None):
-            st.caption(st.session_state.rag_error)
+        st.info("Motor Pedagógico (Experimental)")
 
     if st.button("Limpar Conversa"):
         st.session_state.messages = []
-        st.session_state.memory.clear()
         st.rerun()
 
     st.divider()
@@ -132,18 +111,14 @@ if uploaded_file:
             with st.chat_message("assistant"):
                 with st.spinner("Processando..."):
                     try:
-                        result = run_pipeline(
-                            student_input=extracted_text,
-                            memory=st.session_state.memory,
-                            rag=st.session_state.rag,
-                            scaffolding_level=nivel,
-                            subject=materia if materia != "Geral" else None,
-                            verbose=False,
+                        response = st.session_state.engine.process(
+                            user_input=extracted_text,
+                            session_id="default",
                         )
-                        st.markdown(result.final_response)
+                        st.markdown(response.message)
                         st.session_state.messages.append({
                             "role": "assistant",
-                            "content": result.final_response,
+                            "content": response.message,
                         })
                     except Exception as e:
                         st.error(f"Erro ao processar: {e}")
@@ -156,28 +131,27 @@ if student_input := st.chat_input("Digite sua duvida..."):
     with st.chat_message("assistant"):
         with st.spinner("Analisando sua pergunta..."):
             try:
-                result = run_pipeline(
-                    student_input=student_input,
-                    memory=st.session_state.memory,
-                    rag=st.session_state.rag,
-                    scaffolding_level=nivel,
-                    subject=materia if materia != "Geral" else None,
-                    verbose=False,
+                response = st.session_state.engine.process(
+                    user_input=student_input,
+                    session_id="default",
                 )
-                st.markdown(result.final_response)
+                st.markdown(response.message)
 
+                meta = response.metadata or {}
                 col1, col2, col3 = st.columns(3)
                 with col1:
-                    st.caption(f"Tempo: {result.total_time_s:.1f}s")
+                    if "time_s" in meta:
+                        st.caption(f"Tempo: {meta['time_s']}s")
                 with col2:
-                    st.caption(f"Iteracoes: {result.iterations}")
+                    if "iterations" in meta:
+                        st.caption(f"Iteracoes: {meta['iterations']}")
                 with col3:
-                    if result.rag_used:
+                    if meta.get("rag_used"):
                         st.caption("RAG utilizado")
 
                 st.session_state.messages.append({
                     "role": "assistant",
-                    "content": result.final_response,
+                    "content": response.message,
                 })
             except Exception as e:
                 st.error(f"Erro: {e}")

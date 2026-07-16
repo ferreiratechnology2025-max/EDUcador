@@ -11,7 +11,7 @@ def run(verbose=True):
     passed = 0
     total = 0
 
-    pd_fields = ['action', 'target_competency', 'probe_id', 'params', 'reasoning']
+    pd_fields = ['action', 'target_competency', 'probe_id', 'strategy_params', 'reasoning']
     total += len(pd_fields)
     try:
         from src.learning.domain import PedagogicalDecision
