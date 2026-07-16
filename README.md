@@ -1,212 +1,243 @@
 # EDUcador
 
-Tutor virtual offline-first para ensino medio brasileiro com validacao cruzada entre modelos.
+Tutor virtual offline-first com motor pedagógico baseado em evidências para ensino médio brasileiro.
 
-## O que e o EDUcador?
+## O que é o EDUcador?
 
-Um assistente educacional que roda localmente no seu computador, sem depender de internet. Ele usa:
+Um assistente educacional que roda localmente sem depender de internet. Usa um **motor pedagógico** que decide dinamicamente a ação certa baseada no histórico de evidências do aluno:
 
-- **Gemma 3 4B** como tutor (gera respostas)
-- **Phi-4-mini** como validador (revisa antes de enviar)
-- **Qwen3-8B** como fallback (problemas mais complexos)
-- **llama3.2-vision** como OCR (leitura de imagens de questoes)
+- **Probe**: Pergunta/sonda para avaliar conhecimento
+- **Explain**: Explicação didática de um conceito
+- **Advance**: Avançar para o próximo conceito
+- **Recover_Base**: Revisar pré-requisito (baseado em grafo de conhecimento)
+- **Exercise**: Exercício prático com correção
+- **Analogy**: Analogia para facilitar compreensão
+- **Example**: Exemplo prático
 
-A validacao cruzada entre modelos diferentes e mais robusta que self-check, pois cada modelo tem vieses distintos.
+O motor usa modelos locais via Ollama (Gemma 3, Phi-4-mini, Qwen3-8B) e um **EventStore** que persiste todo o histórico do aluno.
 
-## Interface
+## Status do Projeto
 
-O EDUcador possui duas formas de uso:
+**PR-3 Validation Framework** — 57/59 checks passing
 
-### Modo Chat (Streamlit) — **recomendado**
-```bash
-streamlit run interface.py
-# ou (inicia automaticamente)
-python run.py
-```
-Interface visual com:
-- Chat interativo com historico
-- Upload de imagem com OCR (tire foto da questao)
-- Seletor de materia e nivel de dificuldade
-- Metricas de cada resposta (tempo, iteracoes, RAG)
-
-### Modo Terminal
-```bash
-python -c "from src.core.pipeline import run_pipeline; print(run_pipeline('2x+5=17', verbose=True).final_response)"
-```
-
-## Modelos Necessarios (via Ollama)
+| Validador | Resultado |
+|-----------|-----------|
+| Architecture Validation | 5/5 ✅ |
+| Contract Validation | 22/22 ✅ |
+| Dependency Validation | 5/5 ✅ |
+| Intervention Validation | 8/8 ✅ |
+| Planner Validation | 12/12 ✅ |
+| Readiness Validation | 5/7 ⚠️ (gates not green) |
 
 ```bash
-ollama pull gemma3:4b
-ollama pull phi4-mini
-ollama pull qwen3:8b
-ollama pull llama3.2-vision  # opcional (para OCR)
-```
-
-Ou baixe tudo automaticamente:
-```bash
-python scripts/download_models.py
+python scripts/validation/run_all.py
 ```
 
 ## Como Usar
 
-### 1. Instale as dependencias
+### 1. Instale as dependências
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. Inicie o Ollama
+### 2. Baixe os modelos
+```bash
+ollama pull gemma3:4b
+ollama pull phi4-mini
+ollama pull qwen3:8b
+ollama pull llama3.2-vision  # opcional (OCR)
+```
+
+### 3. Inicie o Ollama
 ```bash
 ollama serve
 ```
 
-### 3. Rode o EDUcador
+### 4. Rode o EDUcador
 ```bash
-# Interface grafica (recomendado)
+# Interface gráfica (Streamlit)
 python run.py
 
 # Modo terminal
 python -m streamlit run interface.py
-
-# Pergunta unica pelo terminal antigo
-echo "qual a formula de Bhaskara?" | python run.py
 ```
 
-## Estrutura do Projeto
+## Arquitetura
 
 ```
 EDUcador/
 ├── src/
-│   ├── core/              # Pipeline, Tutor, Validador
-│   │   ├── pipeline.py    # Orquestracao tutor -> validador -> fallback
-│   │   ├── tutor.py       # Chamadas Gemma 3 4B com scaffolding
-│   │   └── validator.py   # Validacao Phi-4-mini com fallback estrutural
-│   ├── rag/
-│   │   └── simple_rag.py  # Recuperacao por tags + BM25 (zero ML)
-│   ├── memory/
-│   │   └── history.py     # Historico do aluno serializavel
-│   └── utils/
-│       └── ollama_client.py
-├── interface.py            # Dashboard Streamlit com chat + OCR
-├── run.py                  # Entrypoint com verificacao automatica
-├── data/
-│   └── corpus.jsonl        # 10 exemplos (Mat, Fis, Quim, Bio)
-├── tests/                  # Testes unitarios (10/10)
+│   ├── pedagogy/
+│   │   ├── models/              # Domínio pedagógico
+│   │   │   ├── evidence.py       # Evidence, EvidenceType
+│   │   │   ├── context.py        # PedagogicalContext, LearningContext
+│   │   │   ├── action.py         # ActionType, PedagogicalAction
+│   │   │   └── probe.py          # Probe
+│   │   ├── memory/
+│   │   │   └── event_store.py    # EventStore (persistência JSONL)
+│   │   ├── planner/
+│   │   │   ├── interface.py      # DecisionPlanner protocol
+│   │   │   └── rule_based.py     # RuleBasedPlanner (6 regras)
+│   │   ├── extractors/
+│   │   │   └── evidence_extractor.py  # Extração de evidências
+│   │   ├── probes/
+│   │   │   ├── repository.py     # ProbeRepository
+│   │   │   └── evaluator.py      # EvaluatorFactory
+│   │   ├── composer/
+│   │   │   └── instruction_composer.py  # Instruções pedagógicas
+│   │   └── knowledge/
+│   │       └── graph_repository.py  # Grafo de competências
+│   ├── learning/
+│   │   ├── domain/
+│   │   │   └── decision.py       # PedagogicalDecision, ActionType
+│   │   ├── engine/
+│   │   │   ├── pedagogical_engine.py  # Engine principal
+│   │   │   ├── current_pipeline.py    # Pipeline legado
+│   │   │   ├── learning_engine.py     # Interface LearningEngine
+│   │   │   └── factory.py             # Factory pattern
+│   │   ├── executor/
+│   │   │   └── strategy_executor.py   # StrategyExecutor
+│   │   ├── tutor/
+│   │   │   └── llm_tutor.py           # Tutor via LLM
+│   │   ├── presentation/
+│   │   │   └── response.py            # TutorResponse
+│   │   ├── inspector/
+│   │   │   └── engine_inspector.py    # EngineInspector (diagnóstico)
+│   │   └── runtime.py             # PedagogicalRuntime (orquestrador)
+│   ├── core/                      # Pipeline legado (Tutor + Validador)
+│   ├── rag/                       # RAG por tags + BM25
+│   └── memory/                    # Histórico serializável
 ├── config/
-│   └── settings.py         # Configuracoes centralizadas
+│   ├── settings.py                # Configurações centralizadas
+│   ├── project_state.py           # ProjectGate (dois gates + hashes)
+│   ├── competencies.yaml          # Grafo de competências
+│   ├── probes.yaml                # Definição de sondas
+│   ├── planner_rules.yaml         # Regras do planner
+│   └── .gate_state.json           # Estado persistente dos gates
 ├── scripts/
-│   ├── download_models.py  # Download dos modelos para empacotamento
-│   ├── setup.bat           # Setup inicial (Windows)
-│   ├── setup.sh            # Setup inicial (Linux/Mac)
-│   └── verify_ollama.bat   # Verificacao do ambiente
-├── models/                 # Modelos Ollama (para embutir no instalador)
-├── assets/                 # Recursos visuais
-├── EDUcador.spec           # Configuracao PyInstaller
-├── installer.iss           # Script Inno Setup para instalador
-└── requirements.txt        # Dependencias Python
+│   ├── validation/                # PR-3 Validation Framework
+│   │   ├── run_all.py             # Suite runner com CLI
+│   │   ├── manifest.py            # Manifesto dos validadores
+│   │   ├── registry.py            # Registro com descoberta automática
+│   │   ├── invariants.py          # Sistema de invariantes
+│   │   ├── scenarios.py           # 20 cenários (planner + intervention)
+│   │   ├── contract_validator.py  # 22 checks de contrato
+│   │   ├── planner_validator.py   # 12 cenários do planner
+│   │   ├── intervention_validator.py  # 8 cenários de intervenção
+│   │   ├── architecture_validator.py  # 5 checks de arquitetura
+│   │   ├── dependency_validator.py    # 5 checks de dependências
+│   │   └── readiness_validator.py     # 7 checks de readiness
+│   ├── benchmark_engine.py        # Benchmark do motor
+│   ├── benchmark_planner.py       # Benchmark do planner
+│   ├── benchmark_pedagogy.py      # Benchmark pedagógico
+│   └── download_models.py         # Download dos modelos
+├── interface.py                   # Dashboard Streamlit
+└── run.py                         # Entrypoint
 ```
 
-## Como Funciona
+### Ciclo de Decisão Pedagógica
 
-1. **Aluno** faz uma pergunta (texto ou imagem via OCR)
-2. **RAG** recupera exemplos relevantes do corpus por tags
-3. **Tutor (Gemma 3 4B)** gera uma resposta com scaffolding adequado
-4. **Validador (Phi-4-mini)** revisa a resposta com 4 criterios:
-   - Correcao matematica
-   - Didatica
-   - Ausencia de alucinacao
-   - Adequacao ao nivel
-5. Se aprovada -> resposta e enviada ao aluno
-6. Se precisa revisao -> tutor reescreve com feedback (max 2 vezes)
-7. Se rejeitada -> fallback para Qwen3-8B
-8. **Memoria** armazena o historico para contexto em perguntas seguintes
-
-## OCR (Reconhecimento de Imagem)
-
-O EDUcador pode ler questoes de fotos usando **llama3.2-vision**:
-
-1. Clique no seletor de arquivos na interface
-2. Selecione uma foto da questao (PNG/JPG)
-3. O modelo transcreve o texto e equacoes em LaTeX
-4. O pipeline processa automaticamente o texto extraido
-
-## RAG por Tags
-
-O sistema usa um corpus de exemplos (`data/corpus.jsonl`) com tags por materia:
-
-```json
-{"id": 1, "assunto": "Equacao do 1o Grau", "tags": ["equacao_1grau"], ...}
+```
+Entrada do Aluno
+       │
+       ▼
+┌────────────────┐
+│  Evidence       │
+│  Extractor      │  Extrai evidência da resposta
+└───────┬────────┘
+        │ (acerto/erro/ajuda)
+        ▼
+┌────────────────┐
+│  EventStore    │  Persiste evidência
+└───────┬────────┘
+        │
+        ▼
+┌────────────────┐
+│  RuleBased     │  Decide próxima ação
+│  Planner       │  (6 regras determinísticas)
+└───────┬────────┘
+        │ (probe/explain/advance/recover_base/exercise/analogy/example)
+        ▼
+┌────────────────┐
+│  Strategy      │  Executa a ação decidida
+│  Executor      │
+└───────┬────────┘
+        │
+        ▼
+┌────────────────┐
+│  LLM Tutor     │  Gera resposta formatada
+└───────┬────────┘
+        │
+        ▼
+   Resposta Final
 ```
 
-A recuperacao e feita por correspondencia de tags + BM25 simplificado - **zero dependencias de ML**.
+### Regras do Planner
 
-## Testes
+| Condição | Ação |
+|----------|------|
+| Sem competência ativa | PROBE |
+| 3 erros consecutivos | RECOVER_BASE |
+| 3 acertos consecutivos | ADVANCE |
+| Help requested | EXPLAIN |
+| 5+ respostas com probe_id | EXERCISE |
+| Caso contrário | PROBE |
+
+### ProjectGate
+
+O `config/project_state.py` implementa dois gates de governança:
+
+1. **technical_ready** — Motor deve estar tecnicamente válido
+2. **hypothesis_validated** — Hipótese pedagógica deve ser validada com usuários reais
+
+Ambos com hash SHA-256 do estado para detecção de adulteração e blocking em CI.
+
+## Validação
 
 ```bash
 # Suite completa
-python tests/run_all_tests.py
+python scripts/validation/run_all.py
 
-# Individuais
-python -m tests.test_rag
-python -m tests.test_memory
-python -m tests.test_pipeline  # requer Ollama rodando
+# Validadores específicos
+python scripts/validation/run_all.py --select contract
+python scripts/validation/run_all.py --select planner
+python scripts/validation/run_all.py --select intervention
+
+# Relatório JSON
+python scripts/validation/run_all.py --json
+
+# Exigir gates verdes
+python scripts/validation/run_all.py --require-gates
 ```
 
-## Build do Instalador
-
-Para gerar um executavel Windows autonoma:
+## Benchmarks
 
 ```bash
-# 1. Instalar dependencias
-pip install -r requirements.txt
+# Benchmark do motor pedagógico
+python scripts/benchmark_engine.py
 
-# 2. Baixar modelos (requer Ollama e ~7.5 GB)
-python scripts/download_models.py
+# Benchmark das regras do planner
+python scripts/benchmark_planner.py
 
-# 3. Build PyInstaller
-pyinstaller EDUcador.spec
-# Gera: dist/EDUcador/EDUcador.exe
-
-# 4. Compilar instalador Inno Setup
-# Abrir installer.iss no Inno Setup e compilar
-# Gera: Output/EDUcador_Setup.exe (~7.6 GB)
+# Benchmark pedagógico completo
+python scripts/benchmark_pedagogy.py
 ```
 
-## Configuracao
+## Modelos Necessários
 
-Edite `config/settings.py` para ajustar modelos, temperatura e limites.
-
-```python
-ModelConfig.tutor_model = "gemma3:4b"       # Modelo do tutor
-ModelConfig.validator_model = "phi4-mini"    # Modelo validador
-ModelConfig.fallback_model = "qwen3:8b"      # Modelo fallback
-PipelineConfig.max_revisions = 2             # Max revisoes do validador
+```bash
+ollama pull gemma3:4b       # Tutor principal
+ollama pull phi4-mini       # Validador
+ollama pull qwen3:8b        # Fallback
+ollama pull llama3.2-vision # OCR (opcional)
 ```
 
 ## Requisitos
 
-- **Minimo:** Python 3.8+, 8 GB RAM, 10 GB disco
+- **Mínimo:** Python 3.8+, 8 GB RAM, 10 GB disco
 - **Recomendado:** 16 GB RAM, SSD
 - Ollama instalado (https://ollama.com/)
-- Modelos: ~7.5 GB espaco em disco
 
-## Solucao de Problemas
-
-**Erro: ConnectionRefusedError** -> Ollama nao esta rodando: `ollama serve`
-
-**Erro: Modelo nao encontrado** -> Baixe o modelo: `ollama pull gemma3:4b`
-
-**Resposta em loop de revisoes** -> Aumente `max_revisions` no `PipelineConfig` ou ajuste o prompt do validador
-
-**OCR nao funciona** -> Verifique se llama3.2-vision esta instalado: `ollama pull llama3.2-vision`
-
-## Distribuicao
-
-O instalador final pode ser distribuido por:
-- Google Drive / OneDrive (link direto)
-- Torrent (para arquivos grandes ~7.6 GB)
-- Servidor HTTP local
-
-## Licenca
+## Licença
 
 MIT
